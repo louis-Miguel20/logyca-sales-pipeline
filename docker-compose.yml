@@ -60,24 +60,27 @@ services:
       DATABASE_URL: postgresql://logyca:logyca123@postgres:5432/logyca_db
     restart: unless-stopped
 
-  n8n:
+  # Usamos un nombre diferente para el servicio de n8n dentro de este stack
+  # para evitar conflicto con tu contenedor 'n8n-bot' existente.
+  n8n-integration:
     image: n8nio/n8n:latest
-    container_name: n8n-bot
+    container_name: logyca-n8n-integration
     networks:
       - logyca-network
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "5678:5678"
+      # Cambiamos el puerto host a 5679 para evitar conflicto con el 5678 que ya usas
+      - "5679:5678"
     environment:
       N8N_BASIC_AUTH_ACTIVE: "true"
       N8N_BASIC_AUTH_USER: admin
       N8N_BASIC_AUTH_PASSWORD: admin123
-      WEBHOOK_URL: http://localhost:5678
+      WEBHOOK_URL: http://localhost:5679
     volumes:
-      - n8n_data:/home/node/.n8n
+      - n8n_integration_data:/home/node/.n8n
 
 volumes:
   postgres_data:
-  n8n_data:
+  n8n_integration_data:
