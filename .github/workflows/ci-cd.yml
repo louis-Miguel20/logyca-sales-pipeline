@@ -100,8 +100,6 @@ jobs:
         tags: |
           ${{ env.DOCKER_USERNAME }}/logyca-api:${{ github.sha }}
           ${{ env.DOCKER_USERNAME }}/logyca-api:latest
-          # ${{ env.ACR_NAME }}.azurecr.io/logyca-api:${{ github.sha }}
-          # ${{ env.ACR_NAME }}.azurecr.io/logyca-api:latest
 
     - name: Build and Push Worker
       uses: docker/build-push-action@v5
@@ -112,8 +110,6 @@ jobs:
         tags: |
           ${{ env.DOCKER_USERNAME }}/logyca-worker:${{ github.sha }}
           ${{ env.DOCKER_USERNAME }}/logyca-worker:latest
-          # ${{ env.ACR_NAME }}.azurecr.io/logyca-worker:${{ github.sha }}
-          # ${{ env.ACR_NAME }}.azurecr.io/logyca-worker:latest
 
   # -------------------------------------------------------------------------
   # JOB: DEPLOY
@@ -132,18 +128,14 @@ jobs:
     - name: Deploy API to Container Apps
       uses: azure/container-apps-deploy-action@v1
       with:
-        # acrName: ${{ env.ACR_NAME }}
         containerAppName: ${{ env.CONTAINER_APP_API }}
         resourceGroup: ${{ env.RESOURCE_GROUP }}
         imageToDeploy: ${{ env.DOCKER_USERNAME }}/logyca-api:${{ github.sha }}
-        # imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/logyca-api:${{ github.sha }}
         targetPort: 8000
 
     - name: Deploy Worker to Container Apps
       uses: azure/container-apps-deploy-action@v1
       with:
-        # acrName: ${{ env.ACR_NAME }}
         containerAppName: ${{ env.CONTAINER_APP_WORKER }}
         resourceGroup: ${{ env.RESOURCE_GROUP }}
         imageToDeploy: ${{ env.DOCKER_USERNAME }}/logyca-worker:${{ github.sha }}
-        # imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/logyca-worker:${{ github.sha }}
