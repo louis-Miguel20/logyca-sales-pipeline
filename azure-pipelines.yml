@@ -83,7 +83,7 @@ stages:
             env:
               # Si necesitas secrets reales para tests de integración con Azure, pásalos aquí
               # AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING_TEST)
-              pass
+              # pass # ELIMINADO: 'pass' no es válido aquí, era un error de sintaxis
 
           - task: PublishTestResults@2
             condition: succeededOrFailed()

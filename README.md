@@ -12,8 +12,9 @@ Tradicionalmente, cargar un archivo CSV de 5GB en una API hace que el servidor c
 1. **Resiliencia Total (Cero Bloqueos):** La API recibe el archivo, lo sube directamente a Azure Blob Storage, encola un mensaje y responde al usuario en milisegundos. La API nunca se bloquea procesando datos.
 2. **Procesamiento Eficiente en Memoria (Streaming):** El Worker descarga el archivo de Azure en "pedacitos" (Chunks). Puede procesar un archivo de 1 millón de filas consumiendo menos de 50MB de RAM.
 3. **Velocidad Extrema en Base de Datos (Bulk Inserts):** En lugar de hacer `INSERT` fila por fila, el sistema agrupa los datos en lotes y usa el comando nativo `COPY` de PostgreSQL (vía `asyncpg`), siendo entre **10x y 50x más rápido** que las librerías ORM tradicionales como SQLAlchemy.
-4. **Observabilidad Avanzada:** Todo el sistema emite logs estructurados en formato JSON (vía `structlog`), lo que permite rastrear exactamente qué pasó con cada archivo, en qué lote falló o cuánto tardó, ideal para integración con DataDog o ElasticSearch.
-5. **Automatización con n8n:** Incluye una integración lista para usar con n8n para generar reportes y automatizaciones basadas en los datos procesados.
+4. **Inteligencia de Negocio con Metabase:** Incluye un dashboard interactivo para que los analistas visualicen las ventas en tiempo real sin escribir SQL.
+5. **Observabilidad Avanzada:** Todo el sistema emite logs estructurados en formato JSON (vía `structlog`), lo que permite rastrear exactamente qué pasó con cada archivo, en qué lote falló o cuánto tardó.
+6. **Automatización con n8n:** Incluye una integración lista para usar con n8n para generar reportes y automatizaciones basadas en los datos procesados.
 
 ---
 
@@ -44,6 +45,11 @@ El sistema sigue una arquitectura orientada a eventos con desacoplamiento total:
      |
      v
 [ PostgreSQL ] <---- (8) Bulk Insert (COPY) en lotes de 1000 filas
+     ^
+     |
+[ Metabase ] <------ (9) Visualización y BI
+     |
+[ n8n ] <----------- (10) Automatización de Reportes
 ```
 
 ---
@@ -61,6 +67,7 @@ El sistema sigue una arquitectura orientada a eventos con desacoplamiento total:
 | **Structlog** | 24.4.0 | Logging estructurado (JSON) para observabilidad profesional |
 | **Tenacity** | 9.0.0 | Resiliencia y reintentos automáticos (Backoff exponencial) ante fallos de red |
 | **n8n** | Latest | Motor de automatización de flujos de trabajo (Low-Code) |
+| **Metabase** | Latest | Herramienta de Business Intelligence (BI) open source |
 
 ---
 
@@ -79,6 +86,17 @@ cp .env.example .env
 Ejecuta el siguiente comando para construir las imágenes y levantar la base de datos, la API, el Worker y n8n:
 ```powershell
 docker compose up -d --build
+```
+
+### ☁️ Opción: Despliegue desde Docker Hub (Sin construir)
+Si prefieres descargar las imágenes ya construidas en lugar de compilar el código fuente:
+
+1. Modifica el archivo `docker-compose.yml`:
+   - En el servicio `api`, cambia `build: ...` por `image: tu_usuario/logyca-api:latest`
+   - En el servicio `worker`, cambia `build: ...` por `image: tu_usuario/logyca-worker:latest`
+2. Ejecuta:
+```powershell
+docker compose up -d
 ```
 
 ### 3. Ejecutar Pruebas (Tests)
@@ -125,11 +143,17 @@ docker compose logs -f worker
 
 ---
 
-## 🤖 Integración con n8n
+## 🤖 Integración con n8n y Metabase
 
-Hemos incluido un contenedor de **n8n** dedicado para este proyecto, corriendo en el puerto **9000** (para evitar conflictos con otras instancias que puedas tener).
+### Metabase (Business Intelligence)
+Accede a **http://localhost:3000** para ver tus datos visualizados.
+1. Configura la conexión a Postgres (Host: `postgres`, User: `logyca`, Pass: `logyca123`, DB: `logyca_bd`).
+2. Crea preguntas simples como "¿Cuál es el producto más vendido?" o "¿Ventas totales por día?".
 
-### Pasos para usar n8n:
+### n8n (Automatización)
+Hemos incluido un contenedor de **n8n** dedicado para este proyecto, corriendo en el puerto **9000**.
+
+**Pasos para usar n8n:**
 1. Abre tu navegador y entra a: `http://localhost:9000`
 2. El sistema está preconfigurado con autenticación básica de pruebas (según el `docker-compose.yml`):
    - **Usuario:** `admin`

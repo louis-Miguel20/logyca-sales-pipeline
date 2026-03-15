@@ -60,8 +60,6 @@ services:
       DATABASE_URL: postgresql://logyca:logyca123@postgres:5432/logyca_bd
     restart: unless-stopped
 
-  # Usamos un nombre diferente para el servicio de n8n dentro de este stack
-  # para evitar conflicto con tu contenedor 'n8n-bot' existente.
   n8n-integration:
     image: n8nio/n8n:latest
     container_name: logyca-n8n-integration
@@ -71,7 +69,6 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      # CAMBIO: Usamos el puerto 9000 para evitar conflictos con puertos reservados por Hyper-V
       - "9000:5678"
     environment:
       N8N_BASIC_AUTH_ACTIVE: "true"
@@ -81,6 +78,23 @@ services:
     volumes:
       - n8n_integration_data:/home/node/.n8n
 
+  metabase:
+    image: metabase/metabase:latest
+    container_name: logyca-metabase
+    networks:
+      - logyca-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    # ← SIN variables MB_DB_* — Metabase guarda su config interna en el volumen (H2)
+    # logyca_bd se conecta SOLO como fuente de datos desde la interfaz
+    volumes:
+      - metabase_data:/metabase-data
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   n8n_integration_data:
+  metabase_data:
