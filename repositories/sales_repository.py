@@ -7,21 +7,35 @@ from db.connection import get_pool
 logger = structlog.get_logger()
 
 class SalesRepository:
+    """
+    Capa de acceso a datos para la entidad Ventas (Sales).
+    Optimizado para operaciones masivas (Bulk Operations).
+    """
+    
     async def bulk_insert_sales(self, records: List[Tuple[date, int, int, Decimal, Decimal]]) -> int:
         """
-        Inserta masivamente registros de ventas usando PostgreSQL COPY.
-        Es 10-50x más rápido que INSERT individual.
+        Realiza una inserción masiva de registros utilizando el protocolo COPY de PostgreSQL.
+        
+        Eficiencia:
+        - INSERT tradicional: ~100-500 filas/segundo.
+        - COPY (este método): ~10,000-50,000 filas/segundo.
         
         Args:
-            records: Lista de tuplas (date, product_id, quantity, price, total)
+            records: Lista de tuplas con el orden exacto de columnas:
+                     (date, product_id, quantity, price, total)
+                     
+        Returns:
+            int: Número de filas insertadas.
         """
         if not records:
             return 0
             
         pool = await get_pool()
         async with pool.acquire() as conn:
+            # Usamos una transacción para asegurar atomicidad del lote
             async with conn.transaction():
-                # copy_records_to_table espera una lista de tuplas/listas, no diccionarios
+                # copy_records_to_table es la función 'mágica' de asyncpg
+                # que usa el protocolo binario COPY
                 await conn.copy_records_to_table(
                     'sales',
                     records=records,
@@ -33,7 +47,12 @@ class SalesRepository:
 
     async def upsert_daily_summary(self, date_str: str, total_sales: float) -> None:
         """
-        Actualiza o inserta el resumen diario de ventas.
+        Actualiza (Update) o Inserta (Insert) el resumen de ventas de un día específico.
+        Utiliza la cláusula ON CONFLICT de PostgreSQL (Upsert).
+        
+        Args:
+            date_str: Fecha en formato 'YYYY-MM-DD'.
+            total_sales: Monto total vendido ese día.
         """
         pool = await get_pool()
         async with pool.acquire() as conn:
@@ -50,7 +69,10 @@ class SalesRepository:
 
     async def get_daily_summary(self) -> List[dict]:
         """
-        Obtiene el resumen diario de ventas ordenado por fecha descendente.
+        Recupera el histórico de ventas diarias para reportes.
+        
+        Returns:
+            List[dict]: Lista de diccionarios con {date, total_sales}.
         """
         pool = await get_pool()
         async with pool.acquire() as conn:

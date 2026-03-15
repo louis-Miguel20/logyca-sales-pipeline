@@ -14,19 +14,19 @@ pr:
       - main
 
 variables:
-  # Variables de infraestructura (ajustar según tu entorno real)
-  ACR_NAME: 'logycaacr'
+  # Variables de infraestructura
   RESOURCE_GROUP: 'rg-logyca-prueba'
-  CONTAINER_APP_ENV: 'logyca-env' # Environment de Container Apps
+  CONTAINER_APP_ENV: 'logyca-env'
   CONTAINER_APP_API: 'logyca-api'
   CONTAINER_APP_WORKER: 'logyca-worker'
   
-  # Nombres de imagen completos
-  IMAGE_API: '$(ACR_NAME).azurecr.io/logyca-api'
-  IMAGE_WORKER: '$(ACR_NAME).azurecr.io/logyca-worker'
+  # Nombres de imagen en Docker Hub
+  IMAGE_API: 'luismiguelraa/logyca-api'
+  IMAGE_WORKER: 'luismiguelraa/logyca-worker'
   
-  # Service Connections (Deben existir en Azure DevOps)
-  DOCKER_REGISTRY_SERVICE_CONNECTION: 'AzureContainerRegistry'
+  # Service Connections
+  # IMPORTANTE: Debes crear una conexión tipo "Docker Registry" -> "Docker Hub" llamada 'DockerHubConnection'
+  DOCKER_REGISTRY_SERVICE_CONNECTION: 'DockerHubConnection'
   AZURE_SUBSCRIPTION_SERVICE_CONNECTION: 'AzureServiceConnection'
 
 stages:
@@ -80,10 +80,8 @@ stages:
           - script: |
               pytest tests/ --doctest-modules --junitxml=test-results.xml --cov=api --cov=services --cov=worker --cov=repositories --cov-report=xml
             displayName: 'Run Pytest'
-            env:
-              # Si necesitas secrets reales para tests de integración con Azure, pásalos aquí
-              # AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING_TEST)
-              # pass # ELIMINADO: 'pass' no es válido aquí, era un error de sintaxis
+            # env: # Descomentar y agregar variables si se necesitan secrets en el futuro
+            #   AZURE_STORAGE_CONNECTION_STRING: $(AZURE_STORAGE_CONNECTION_STRING_TEST)
 
           - task: PublishTestResults@2
             condition: succeededOrFailed()
@@ -157,20 +155,18 @@ stages:
             displayName: 'Deploy API'
             inputs:
               azureSubscription: '$(AZURE_SUBSCRIPTION_SERVICE_CONNECTION)'
-              acrName: '$(ACR_NAME)'
+              # acrName: '$(ACR_NAME)' # No necesario para Docker Hub
               imageToDeploy: '$(IMAGE_API):$(Build.BuildId)'
               containerAppName: '$(CONTAINER_APP_API)'
               resourceGroup: '$(RESOURCE_GROUP)'
               targetPort: 8000
-              # environmentVariables: # Descomentar si quieres inyectar variables en deployment
-              #   DATABASE_URL: $(DATABASE_URL_PROD) 
 
           # Desplegar Worker
           - task: AzureContainerApps@1
             displayName: 'Deploy Worker'
             inputs:
               azureSubscription: '$(AZURE_SUBSCRIPTION_SERVICE_CONNECTION)'
-              acrName: '$(ACR_NAME)'
+              # acrName: '$(ACR_NAME)' # No necesario para Docker Hub
               imageToDeploy: '$(IMAGE_WORKER):$(Build.BuildId)'
               containerAppName: '$(CONTAINER_APP_WORKER)'
               resourceGroup: '$(RESOURCE_GROUP)'

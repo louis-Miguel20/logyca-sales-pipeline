@@ -13,26 +13,43 @@ async def get_job_status(
     job_id: UUID = Path(..., title="El ID del trabajo a consultar")
 ):
     """
-    Obtiene el estado actual de un trabajo de procesamiento.
+    Consulta el estado actual de un trabajo de procesamiento (Polling).
+
+    Permite al cliente saber si su archivo ya fue procesado, si está en progreso
+    o si falló.
+
+    Args:
+        job_id (UUID): Identificador único del trabajo retornado por /upload.
+
+    Returns:
+        JobResponse: Objeto con el estado actual, fecha de creación y errores si los hubo.
+
+    Raises:
+        HTTPException 404: Si el Job ID no existe en la base de datos.
+        HTTPException 500: Error de conexión a base de datos.
     """
     try:
         pool = await get_pool()
         async with pool.acquire() as conn:
-            # Importante: usar $1::uuid para casting explícito si es necesario, 
-            # aunque asyncpg suele manejar UUIDs nativos de python bien.
+            # Consultamos directamente a la BD. 
+            # Usamos $1::uuid para asegurar que Postgres entienda el tipo de dato,
+            # aunque asyncpg maneja la conversión de UUID de Python automáticamente.
             row = await conn.fetchrow(
-                "SELECT id, file_name, status, created_at, error_message FROM jobs WHERE id = $1",
+                """
+                SELECT id, file_name, status, created_at, error_message 
+                FROM jobs 
+                WHERE id = $1
+                """,
                 job_id
             )
             
             if not row:
-                # Si no encuentra por UUID, intentar buscar como texto (por si acaso)
-                # O simplemente lanzar 404
+                logger.warning("job_not_found", job_id=str(job_id))
                 raise HTTPException(status_code=404, detail=f"Job {job_id} no encontrado")
             
-            # Mapear status string a Enum
+            # Convertimos el string de la BD al Enum de Pydantic
+            # Esto valida que el estado sea uno de los permitidos (PENDING, PROCESSING, etc.)
             status_str = row["status"]
-            # Asegurar compatibilidad con mayúsculas/minúsculas
             status_enum = JobStatus(status_str.upper())
 
             return JobResponse(
@@ -42,7 +59,9 @@ async def get_job_status(
                 created_at=row["created_at"],
                 error_message=row["error_message"]
             )
+            
     except HTTPException:
+        # Re-lanzamos excepciones HTTP ya controladas
         raise
     except Exception as e:
         logger.error("error_fetching_job", job_id=str(job_id), error=str(e))
