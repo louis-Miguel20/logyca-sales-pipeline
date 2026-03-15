@@ -25,19 +25,19 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await logger.info("startup", message="Iniciando aplicación")
+    logger.info("startup", message="Iniciando aplicación")
     await create_pool()
     try:
         await init_azure_resources()
-        await logger.info("startup_resources", message="Recursos Azure inicializados")
+        logger.info("startup_resources", message="Recursos Azure inicializados")
     except Exception as e:
-        await logger.warning("startup_azure_error", error=str(e))
+        logger.warning("startup_azure_error", error=str(e))
     
     yield
     
     # Shutdown
     await close_pool()
-    await logger.info("shutdown", message="Aplicación detenida")
+    logger.info("shutdown", message="Aplicación detenida")
 
 app = FastAPI(
     title="LOGYCA Sales Pipeline",

@@ -28,7 +28,7 @@ class SalesRepository:
                     columns=['date', 'product_id', 'quantity', 'price', 'total']
                 )
                 
-        await logger.info("bulk_insert_completed", rows=len(records))
+        logger.info("bulk_insert_completed", rows=len(records))
         return len(records)
 
     async def upsert_daily_summary(self, date_str: str, total_sales: float) -> None:

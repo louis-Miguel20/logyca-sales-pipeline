@@ -23,7 +23,7 @@ class BlobService:
         Sube un archivo a Azure Blob Storage con reintentos automáticos.
         """
         log = logger.bind(blob_name=blob_name, size=len(file_content))
-        await log.info("blob_upload_started")
+        log.info("blob_upload_started")
 
         try:
             async with BlobServiceClient.from_connection_string(self.connection_string) as client:
@@ -35,10 +35,10 @@ class BlobService:
                 blob_client = container_client.get_blob_client(blob_name)
                 await blob_client.upload_blob(file_content, overwrite=True)
                 
-                await log.info("blob_upload_completed")
+                log.info("blob_upload_completed")
                 return blob_name
         except Exception as e:
-            await log.error("blob_upload_failed", error=str(e))
+            log.error("blob_upload_failed", error=str(e))
             raise
 
     async def download_file_stream(self, blob_name: str) -> AsyncIterator[bytes]:
@@ -58,8 +58,8 @@ class BlobService:
                 async for chunk in stream.chunks():
                     yield chunk
         except ResourceNotFoundError:
-            await log.warning("blob_not_found")
+            log.warning("blob_not_found")
             raise
         except Exception as e:
-            await log.error("blob_download_failed", error=str(e))
+            log.error("blob_download_failed", error=str(e))
             raise

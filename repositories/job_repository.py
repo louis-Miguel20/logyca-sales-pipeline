@@ -51,7 +51,7 @@ class JobRepository:
                 """,
                 job_id, status, error_message
             )
-            await logger.info("job_status_updated", job_id=job_id, status=status)
+            logger.info("job_status_updated", job_id=job_id, status=status)
 
     async def get_completed_jobs(self, since_minutes: int = 10) -> List[dict]:
         """

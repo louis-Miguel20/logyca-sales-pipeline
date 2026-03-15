@@ -23,7 +23,7 @@ class CsvProcessor:
         Lee chunks, parsea líneas y hace bulk insert en lotes.
         """
         log = logger.bind(job_id=job_id, blob_name=blob_name)
-        await log.info("csv_processing_started")
+        log.info("csv_processing_started")
 
         total_processed = 0
         batch: List[Tuple] = []
@@ -74,11 +74,11 @@ class CsvProcessor:
                 await self._insert_batch(batch, job_id)
                 total_processed += len(batch)
 
-            await log.info("csv_processing_completed", total_rows=total_processed)
+            log.info("csv_processing_completed", total_rows=total_processed)
             return total_processed
 
         except Exception as e:
-            await log.error("csv_processing_failed", error=str(e))
+            log.error("csv_processing_failed", error=str(e))
             raise
 
     def _parse_line(self, line: str, job_id: str) -> Tuple:

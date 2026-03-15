@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 settings = get_settings()
 
 async def main():
-    await logger.info("worker_starting")
+    logger.info("worker_starting")
     
     # Inicializar pool de base de datos
     await create_pool()
@@ -45,11 +45,17 @@ async def main():
     # Registrar señales (SIGINT/SIGTERM no funcionan igual en Windows, pero útil para Linux/Docker)
     # En Windows, KeyboardInterrupt se maneja en el bloque try/except principal
     if hasattr(signal, 'SIGINT'):
-        loop.add_signal_handler(signal.SIGINT, signal_handler)
+        try:
+            loop.add_signal_handler(signal.SIGINT, signal_handler)
+        except NotImplementedError:
+            pass # Windows
     if hasattr(signal, 'SIGTERM'):
-        loop.add_signal_handler(signal.SIGTERM, signal_handler)
+        try:
+            loop.add_signal_handler(signal.SIGTERM, signal_handler)
+        except NotImplementedError:
+            pass
 
-    await logger.info("worker_ready_polling_queue", queue_name=settings.azure_queue_name)
+    logger.info("worker_ready_polling_queue", queue_name=settings.azure_queue_name)
 
     while not stop_event.is_set():
         try:
@@ -66,13 +72,16 @@ async def main():
                     
                 log = logger.bind(message_id=message.id)
                 
+                job_id = None
                 try:
+                    # En Azure Queue Storage v12, content ya es string si usamos text encoding por defecto,
+                    # pero nuestra QueueService maneja base64. Verificamos:
                     payload = queue_service.decode_message(message.content)
                     job_id = payload.get('job_id')
                     blob_name = payload.get('blob_name')
                     
                     log = log.bind(job_id=job_id, blob_name=blob_name)
-                    await log.info("processing_message")
+                    log.info("processing_message")
                     
                     # 1. Marcar Job como PROCESSING
                     await job_repo.update_status(job_id, 'PROCESSING')
@@ -86,27 +95,30 @@ async def main():
                     # 4. Eliminar mensaje de la cola (SOLO SI ÉXITO)
                     await queue_service.delete_message(message.id, message.pop_receipt)
                     
-                    await log.info("job_completed_successfully", rows=rows_processed)
+                    log.info("job_completed_successfully", rows=rows_processed)
                     
                 except Exception as e:
-                    await log.error("job_processing_failed", error=str(e))
+                    log.error("job_processing_failed", error=str(e))
                     # Marcar Job como FAILED
                     if job_id:
                         await job_repo.update_status(job_id, 'FAILED', str(e))
                     
                     # IMPORTANTE: Eliminamos el mensaje aunque falle para evitar bucles infinitos
                     # (Dead Letter Queue sería mejor en producción real, pero por simplicidad aquí se elimina)
-                    await queue_service.delete_message(message.id, message.pop_receipt)
+                    try:
+                        await queue_service.delete_message(message.id, message.pop_receipt)
+                    except Exception:
+                        pass # Si falla borrar, logueado en servicio
 
         except asyncio.CancelledError:
-            await logger.info("worker_task_cancelled")
+            logger.info("worker_task_cancelled")
             break
         except Exception as e:
-            await logger.error("worker_loop_error", error=str(e))
+            logger.error("worker_loop_error", error=str(e))
             await asyncio.sleep(5)  # Esperar antes de reintentar en caso de error grave
 
     await close_pool()
-    await logger.info("worker_shutdown_complete")
+    logger.info("worker_shutdown_complete")
 
 if __name__ == '__main__':
     try:

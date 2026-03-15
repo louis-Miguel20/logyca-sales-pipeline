@@ -1,0 +1,207 @@
+{
+  "name": "LOGYCA - Sales Daily Summary v2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "node-0001-sched-trigger-logyca",
+      "name": "Cada 5 Minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [180, 300],
+      "notes": "Requerimiento 1: consulta periodica"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS total\nFROM jobs\nWHERE status = 'COMPLETED';",
+        "options": {}
+      },
+      "id": "node-0002-check-jobs-logyca",
+      "name": "Verificar Jobs Completados",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [400, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_CON_TU_CREDENTIAL_ID",
+          "name": "PostgreSQL Logyca"
+        }
+      },
+      "notes": "Requerimiento 1: SELECT COUNT de jobs con status COMPLETED"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-jobs-gt-zero-logyca",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-0003-if-has-jobs-logyca",
+      "name": "Hay Jobs Completados?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [620, 300],
+      "notes": "Verifica que el COUNT sea > 0 antes de proceder"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  date::text AS date,\n  ROUND(SUM(quantity * price)::numeric, 2) AS total_sales\nFROM sales\nGROUP BY date\nORDER BY date ASC;",
+        "options": {}
+      },
+      "id": "node-0004-calc-sales-logyca",
+      "name": "Calcular Ventas por Dia",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [840, 160],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_CON_TU_CREDENTIAL_ID",
+          "name": "PostgreSQL Logyca"
+        }
+      },
+      "notes": "Requerimiento 2: calcula total de ventas por dia. Retorna N filas (una por fecha). n8n las procesa individualmente en el nodo siguiente."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO sales_daily_summary (date, total_sales, updated_at)\nVALUES (\n  '{{ $json.date }}'::date,\n  {{ $json.total_sales }},\n  NOW()\n)\nON CONFLICT (date)\nDO UPDATE SET\n  total_sales = EXCLUDED.total_sales,\n  updated_at = NOW();",
+        "options": {}
+      },
+      "id": "node-0005-upsert-summary-logyca",
+      "name": "Guardar en sales_daily_summary",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1060, 160],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_CON_TU_CREDENTIAL_ID",
+          "name": "PostgreSQL Logyca"
+        }
+      },
+      "notes": "Requerimiento 3: este nodo corre UNA VEZ POR CADA FECHA retornada por el nodo anterior. n8n hace el loop automaticamente. Usa UPSERT para no duplicar filas."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-no-jobs-logyca",
+              "name": "estado",
+              "value": "Sin jobs completados en este ciclo",
+              "type": "string"
+            },
+            {
+              "id": "assign-ts-logyca",
+              "name": "verificado_en",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-0006-no-jobs-logyca",
+      "name": "Sin Jobs Completados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [840, 460],
+      "notes": "Rama FALSE: no hay jobs completados. El workflow termina limpiamente sin error."
+    }
+  ],
+  "connections": {
+    "Cada 5 Minutos": {
+      "main": [
+        [
+          {
+            "node": "Verificar Jobs Completados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Jobs Completados": {
+      "main": [
+        [
+          {
+            "node": "Hay Jobs Completados?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay Jobs Completados?": {
+      "main": [
+        [
+          {
+            "node": "Calcular Ventas por Dia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin Jobs Completados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Ventas por Dia": {
+      "main": [
+        [
+          {
+            "node": "Guardar en sales_daily_summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "logyca-sales-pipeline"
+  },
+  "id": "logyca-sales-summary-v2",
+  "tags": [
+    { "name": "logyca" },
+    { "name": "sales-pipeline" },
+    { "name": "v2-corregido" }
+  ]
+}

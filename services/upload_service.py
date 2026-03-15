@@ -28,7 +28,7 @@ class UploadService:
         file_size = len(content)
         
         log = logger.bind(filename=file.filename, blob_name=blob_name, size=file_size)
-        await log.info("upload_started")
+        log.info("upload_started")
 
         try:
             # 1. Crear Job (PENDING)
@@ -40,9 +40,9 @@ class UploadService:
             # 3. Enviar a Queue
             await self.queue_service.send_message(job_id, blob_name)
             
-            await log.info("upload_completed", job_id=job_id)
+            log.info("upload_completed", job_id=job_id)
             return job_id
             
         except Exception as e:
-            await log.error("upload_failed", error=str(e))
+            log.error("upload_failed", error=str(e))
             raise

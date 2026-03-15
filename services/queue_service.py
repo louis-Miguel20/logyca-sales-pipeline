@@ -45,9 +45,9 @@ class QueueService:
                     pass  # Ignorar si ya existe
 
                 await queue_client.send_message(encoded_message)
-                await log.info("queue_message_sent")
+                log.info("queue_message_sent")
         except Exception as e:
-            await log.error("queue_send_failed", error=str(e))
+            log.error("queue_send_failed", error=str(e))
             raise
 
     async def receive_messages(self, max_messages: int = 5) -> list:
@@ -63,7 +63,7 @@ class QueueService:
                     messages.append(msg)
                 return messages
         except Exception as e:
-            await logger.error("queue_receive_failed", error=str(e))
+            logger.error("queue_receive_failed", error=str(e))
             return []
 
     async def delete_message(self, message_id: str, pop_receipt: str) -> None:
@@ -75,9 +75,9 @@ class QueueService:
                 queue_client = client.get_queue_client(self.queue_name)
                 await queue_client.delete_message(message_id, pop_receipt)
         except ResourceNotFoundError:
-            await logger.warning("queue_message_not_found_for_deletion", message_id=message_id)
+            logger.warning("queue_message_not_found_for_deletion", message_id=message_id)
         except Exception as e:
-            await logger.error("queue_delete_failed", message_id=message_id, error=str(e))
+            logger.error("queue_delete_failed", message_id=message_id, error=str(e))
             raise
 
     def decode_message(self, content: str) -> dict:

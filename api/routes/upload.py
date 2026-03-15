@@ -43,7 +43,7 @@ async def upload_csv(
         )
         
     except Exception as e:
-        await logger.error("upload_failed", filename=file.filename, error=str(e))
+        logger.error("upload_failed", filename=file.filename, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error procesando la carga: {str(e)}"

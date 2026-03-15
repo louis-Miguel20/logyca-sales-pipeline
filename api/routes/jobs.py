@@ -18,17 +18,26 @@ async def get_job_status(
     try:
         pool = await get_pool()
         async with pool.acquire() as conn:
+            # Importante: usar $1::uuid para casting explícito si es necesario, 
+            # aunque asyncpg suele manejar UUIDs nativos de python bien.
             row = await conn.fetchrow(
                 "SELECT id, file_name, status, created_at, error_message FROM jobs WHERE id = $1",
                 job_id
             )
             
             if not row:
-                raise HTTPException(status_code=404, detail="Job no encontrado")
+                # Si no encuentra por UUID, intentar buscar como texto (por si acaso)
+                # O simplemente lanzar 404
+                raise HTTPException(status_code=404, detail=f"Job {job_id} no encontrado")
             
+            # Mapear status string a Enum
+            status_str = row["status"]
+            # Asegurar compatibilidad con mayúsculas/minúsculas
+            status_enum = JobStatus(status_str.upper())
+
             return JobResponse(
                 job_id=str(row["id"]),
-                status=JobStatus(row["status"]),
+                status=status_enum,
                 file_name=row["file_name"],
                 created_at=row["created_at"],
                 error_message=row["error_message"]
@@ -36,5 +45,5 @@ async def get_job_status(
     except HTTPException:
         raise
     except Exception as e:
-        await logger.error("error_fetching_job", job_id=str(job_id), error=str(e))
+        logger.error("error_fetching_job", job_id=str(job_id), error=str(e))
         raise HTTPException(status_code=500, detail="Error interno del servidor")
