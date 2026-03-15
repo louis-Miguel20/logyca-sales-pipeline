@@ -1,3 +1,4 @@
+[![CI/CD Pipeline](https://github.com/louis-Miguel20/logyca-sales-pipeline/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/louis-Miguel20/logyca-sales-pipeline/actions/workflows/ci-cd.yml)
 # LOGYCA Sales Pipeline
 
 Sistema distribuido de alto rendimiento para la ingesta, procesamiento y análisis de ventas masivas mediante archivos CSV. Diseñado para escalar horizontalmente y manejar **millones de registros** sin saturar la memoria RAM ni colapsar la base de datos.
